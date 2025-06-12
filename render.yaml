@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: shopify-scraper
+    env: python
+    buildCommand: bash build.sh
+    startCommand: python app.py
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10
