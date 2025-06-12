@@ -3,43 +3,38 @@ from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 
-@app.route("/scrape", methods=["POST"])
+@app.route('/scrape', methods=['POST'])
 def scrape():
     data = request.get_json()
     url = data.get("url")
+
     if not url:
-        return jsonify({"error": "Missing URL"}), 400
+        return jsonify({"error": "Missing 'url' in request"}), 400
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch()
             page = browser.new_page()
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            page.goto(url)
 
-            # Try to get PDP description (very basic selector, might need refining per site)
-            try:
-                description = page.query_selector("div[id*=description], .product-description, .rte").inner_text()
-            except:
-                description = "No description found."
+            # Example: grab page title
+            title = page.title()
 
-            # Try Yotpo reviews
+            # Example: try to grab reviews if Yotpo or Judge.me present
             reviews = []
-            try:
-                page.wait_for_selector(".yotpo-review", timeout=5000)
-                review_elements = page.query_selector_all(".yotpo-review .content-review")
-                for r in review_elements[:5]:
-                    reviews.append(r.inner_text())
-            except:
-                reviews = ["No Yotpo reviews found."]
+            if 'yotpo' in page.content().lower():
+                reviews = page.locator('.yotpo-review').all_text_contents()
+            elif 'judgeme' in page.content().lower():
+                reviews = page.locator('.jdgm-review').all_text_contents()
 
             browser.close()
+
             return jsonify({
-                "description": description,
+                "url": url,
+                "title": title,
                 "reviews": reviews
             })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
